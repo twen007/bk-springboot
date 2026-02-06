@@ -1,0 +1,12 @@
+**/nbproject/private/
+build/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+backend/nb-configuration.xml
+backend/pom.xml
+local_only/
+frontend/bootstrap.json
+frontend/bootstrap.jsonp
+frontend/package-lock.json

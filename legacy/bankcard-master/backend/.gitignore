@@ -1,0 +1,5 @@
+/.svn
+/target
+/src/main/webapp/app/resources/.arch-internal-preview.css
+/src/main/webapp/app/resources/Readme.md
+/src/main/webapp/WEB-INF/web.xml

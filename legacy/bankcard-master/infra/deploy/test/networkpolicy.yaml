@@ -1,0 +1,23 @@
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: empbc-network-policy
+  namespace: emp-test
+spec:
+  podSelector:
+    matchLabels:
+      app: empbc
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        # IP address of ALB
+        - ipBlock:
+            cidr: 10.208.206.0/24
+        - ipBlock:
+            cidr: 10.208.207.0/24
+        # to block inbound connections from other pods / namespaces
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8443

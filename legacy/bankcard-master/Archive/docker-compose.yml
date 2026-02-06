@@ -1,0 +1,44 @@
+version: '4.1'
+# For this to work, you need to build a Oracle db image first, setup, create accounts, import
+# bankcard data, save it as bankcard_local_db:1.0 in your local docker repo
+# to start, run docker-compose up -d
+# To Test, after containers started, go to http://localhost:9090/empbc/app/index.html#dashboard
+
+volumes:
+  oracle-log:
+    external: true #same reason as the oracle-data
+  oracle-data:
+    # oracle db takes a long time to build, setup, import data, so used a working db built previously
+    # to start it fast with everything
+    # if not using this option, a new volumn will be created and oracle will init
+    # and it only takes 20 minutes to be ready. then you need to config and import data, good luck!
+    external: true 
+
+services:
+  oracle-db:
+    image: bankcard_local_db:1.0 # Or create a complex dockfile to build a working oracle db from scratch
+    container_name: bankcard-db
+    ports:
+      - "1521:1521" # Expose port 1521 to the host (optional, for external access)
+      - "5500:5500"
+    volumes:
+      - oracle-log:/opt/oracle/diag # oracle logs
+      - oracle-data:/opt/oracle/oradata # contains schema and data 
+    networks:
+      - my-app-network
+
+  tomcat-app:
+    build:
+      context: ./ # Path to your Dockerfile
+      dockerfile: Dockerfile
+    container_name: bankcard-app
+    ports:
+      - "9090:8080" # Expose port 8080 to the host port 9090
+    depends_on:
+      - oracle-db # Ensure Oracle starts before Tomcat
+    networks:
+      - my-app-network
+
+networks:
+  my-app-network:
+    driver: bridge

@@ -1,0 +1,51 @@
+1) Install latest version of Tomcat 8. (Currently 8.5.38)
+
+
+
+2) Install Oracle's jdbc driver in Tomcat
+    - In the {tomcat_home}/lib directory put the ojdbc8.jar file
+
+
+
+3) Configure context.xml file
+    - In the {tomcat_home}/conf directory modify jdbc connection info. In bottom of
+      
+file before the </Context> closing tag put this xml tag
+
+
+      
+<Resource name="jdbc/bcws"
+              
+auth="Container"
+              
+type="javax.sql.DataSource"
+              
+username="BCPMS_OWNER"
+              
+password="whatever password here"
+              
+driverClassName="oracle.jdbc.OracleDriver"
+              
+url="jdbc:oracle:thin:@127.0.0.1:12001:mml2dvi"
+              
+maxActive="150"
+              
+maxIdle="10" />
+
+ 
+   
+- NOTE: the 12001 in the url is the port set up for port forwarding to the db server.
+
+ So it depends on which port you set to forward in your SSH client.
+
+4) Configure tomcat-users.xml file
+    - In the {tomcat_home}/conf directory modify the tomcat-users.xml file. In the bottom
+      
+of file above the </tomcat-users> xml tag put the connection information used to manage
+      
+the Netbeans auto-deploy feature with the username/password combination used when
+      
+setting up Tomcat in Netbeans. Make sure the roles are "manager-script,admin".
+
+      
+<user password="password goes here" roles="manager-script,admin" username="username goes here"/>

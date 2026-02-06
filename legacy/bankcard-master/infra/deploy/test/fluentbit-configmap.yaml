@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-sidecar-config-empbc
+  namespace: emp-test
+  labels:
+    app: emp
+data:
+  # Configuration files: server, input, filters and output
+  # ======================================================
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush         1
+        Log_Level     info
+        Daemon        off
+        Parsers_File  parsers.conf
+    @INCLUDE input-java.conf
+    @INCLUDE filter-stdout.conf
+  input-java.conf: |
+    [INPUT]
+        Name              tail
+        Tag               tomcat
+        Path              /mnt/log/*.log
+        Multiline         On
+        Parser_Firstline  java_multiline
+        Mem_Buf_Limit     50MB
+        Skip_Long_Lines   On
+        Refresh_Interval  10
+        Rotate_Wait       30
+        Read_from_Head    ${READ_FROM_HEAD}
+
+  filter-stdout.conf: |
+    [FILTER]
+        Name           stdout
+        Match          tomcat
+  parsers.conf: |
+    [PARSER]
+        Name        java_multiline
+        Format      regex
+        Regex       /^(?<time>\d{4}-\d{1,2}-\d{1,2} \d{1,2}:\d{1,2}:\d{1,2}) \[(?<thread>.*)\] (?<level>[^\s]+)(?<message>.*)/
+        Time_Key    time
+        Time_Format %Y-%m-%d %H:%M:%S

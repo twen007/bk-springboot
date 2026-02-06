@@ -1,0 +1,75 @@
+<?xml version="1.0" ?> 
+<project name="EMPBC" default="war" basedir=".">
+
+	<property name="deploy.dir" value="${basedir}/deploy"/>
+	<property name="sencha.dir" value="C:/Git/web_bankcard/build/production/bcp"/>
+	<property name="senchabuild.dir" value="C:/Git/web_bankcard/"/>
+	
+	<path id="compile.classpath">
+		<fileset dir="lib">
+			<include name="*.jar"/>
+		</fileset>
+	</path>
+
+	<target name="buildsencha">
+        <exec executable="cmd" dir="${senchabuild.dir}">
+		    <arg value="/c"/>
+            <arg value="dosenchabuild.bat"/>
+        </exec>
+	</target>
+
+	<target name="init" depends="buildsencha">
+		<mkdir dir="build/classes"/>
+	
+		<mkdir dir="build/WEB-INF"/>
+		<mkdir dir="build/WEB-INF/classes"/>
+		<mkdir dir="build/WEB-INF/lib"/>
+		<mkdir dir="dist" />			
+	</target>
+	
+	<target name="compile" depends="init" >
+		<javac destdir="build/WEB-INF/classes" debug="true" srcdir="src">
+			<classpath refid="compile.classpath"/>
+		</javac>
+	</target>
+	
+	<target name="war" depends="compile">
+		<copy file="${sencha.dir}/app.js" tofile="${basedir}/webContent/secure/app.js" overwrite="yes"/>
+   		<war destfile="dist/empbc.war" webxml="webContent/WEB-INF/web.xml">
+			<fileset dir="webContent"/>
+			<lib dir="lib"/>
+			<classes dir="build/WEB-INF/classes"/>
+		</war>
+	</target>
+	
+	<target name="test.deployment" depends="compile">
+		<copy file="${sencha.dir}/app.js" tofile="${basedir}/webContent/secure/app.js" overwrite="yes"/>
+   		<war destfile="dist/empbc.war" webxml="webContent/WEB-INF/web.xml">
+			<fileset dir="webContent"/>
+			<lib dir="lib"/>
+			<classes dir="build/WEB-INF/classes"/>
+		</war>
+	</target>
+
+	<target name="prod.deployment" depends="compile">
+		<copy file="${sencha.dir}/app.js" tofile="${basedir}/webContent/secure/app.js" overwrite="yes"/>
+   		<war destfile="dist/empbc.war" webxml="webContent/WEB-INF/web.xml">
+			<fileset dir="webContent"/>
+			<lib dir="lib"/>
+			<classes dir="build/WEB-INF/classes"/>
+		</war>
+	</target>
+
+	<target name="dodeploy" depends="war">
+        <exec executable="cmd" dir="${deploy.dir}">
+		    <arg value="/c"/>
+            <arg value="deploy.bat"/>
+        </exec>
+	</target>
+
+	<target name="clean">
+		<delete dir="dist" />
+		<delete dir="build" />
+	</target>
+	
+</project>

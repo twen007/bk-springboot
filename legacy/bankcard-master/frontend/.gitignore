@@ -1,0 +1,13 @@
+.architect
+bootstrap.css
+build/
+classic.json
+classic.jsonp
+ext/
+modern.json
+modern.jsonp
+resources/sass/.sass-cache/
+resources/.arch-internal-preview.css
+.arch-internal-preview.css
+node_modules
+bankcard_workspace.code-workspace

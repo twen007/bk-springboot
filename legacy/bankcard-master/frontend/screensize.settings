@@ -1,0 +1,11 @@
+{
+    "profiles": [
+        {
+            "name": "phone",
+            "width": 320,
+            "height": 480,
+            "builtIn": false,
+            "fw": "ext"
+        }
+    ]
+}

@@ -1,0 +1,45 @@
+//csss for the scrolling text in the header
+.scrolling-container {
+    overflow: hidden; /* Hide overflowing content */
+    white-space: nowrap; /* Prevent text wrapping */
+    width: 100%; /* Set to the width of the parent container */
+    position: relative; /* Position relative for child positioning */
+}
+.scrolling-text {
+    display: inline-block; /* Make it inline block for width calculation */
+    animation: scroll 25s linear 3 forwards;//infinite; /* Scroll for 25 seconds, 3 times, and keep the final state */
+}
+@keyframes scroll {
+    0% { transform: translateX(100%); opacity: 1; }    /* Start from the right and fully visible */
+    66% { transform: translateX(0); opacity: 1; }      /* Remain visible at the center */
+    100% { transform: translateX(-100%); opacity: 0; } /* End at the left and fade out */
+}
+
+.x-btn.x-badge {
+    position: relative; // Establishes a positioning context for the pseudo-element
+    overflow: visible;  // Ensures the badge isn't clipped if the button itself has overflow: hidden
+}
+
+.x-btn.x-badge::after {
+    content: attr(data-qtip); // Retrieves the badge text from the tooltip attribute
+    position: absolute;
+    top: -5px;          // Adjust for desired vertical position (negative to go above the top edge)
+    right: -5px;        // Adjust for desired horizontal position (negative to go beyond the right edge)
+    
+    background-color: #f44336; // A distinct background color for the badge (e.g., red)
+    color: white;              // Text color for the badge
+    
+    font-size: 10px;           // Smaller font size for the badge
+    font-weight: bold; 
+    
+    padding: 2px 6px;          // Padding inside the badge
+    border-radius: 10px;       // Rounded corners for a pill-shape
+    
+    line-height: 1;            // Ensures consistent line height
+    white-space: nowrap;       // Prevents the badge text from wrapping
+    
+    z-index: 10;               // Ensures the badge is displayed on top of other button elements
+    
+    // Optional: Add a small shadow for better visibility
+    // box-shadow: 0 0 3px rgba(0,0,0,0.3);
+}

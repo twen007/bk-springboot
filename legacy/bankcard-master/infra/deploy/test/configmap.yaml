@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: empbc-test-config
+  namespace: emp-test
+data:
+  db_user: "{DB_USER}"
+  db_url: "{DB_URL}"
+  jndi_name: "{JNDI_NAME}"
+  env: "{ENV}"
+  AWS_REGION: "{AWS_REGION}"
+  CLUSTER_NAME: "{CLUSTER_NAME}"
+  appRedirectURI: "{appRedirectURI}"
+  appLogoutURI: "{appLogoutURI}"
+  target_mode: "{ENV}"
+  certSecretID: "{certSecretID}"
+  chainSecretID: "{chainSecretID}"
+  oktaroot: "{oktaroot}"
+  dependency: "{dependency}"

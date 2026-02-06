@@ -1,0 +1,35 @@
+--check records in route table: select * from route order by request_id, route_id
+--use route step to enables reliable dynamic or conditional route stop that can be inserted as planned routes (route_date is null)
+
+ALTER TABLE BCPMS_OWNER.ROUTE
+ ADD (ROUTE_STEP  INTEGER);
+
+--cannot be max(route_id) to determine the next step in the route process anymore since we can insert planned routes, which are not 
+--current step, so add a current_route which stores the route_id of the current step. the value is updated by any SP that insert new routes
+--or executes planned routes (update route_date to sysdate)
+
+ALTER TABLE BCPMS_OWNER.REQUEST
+ ADD (CURRENT_ROUTE  INTEGER);
+
+--Add dynamic type so ITSO will not be a fixed route type (it cause issue in the NAP becuase ITSO can happen in any stage after submission. If we use it
+--as a fixed route type, it can overwrite the type before(submitted, approved, ordered...) and NAP cannot determine if th request is pending or committement
+--Also, it can be used to store other dynamic types such as DR and AA and future dynamic types. For now, we have
+--DR for dynamic reroute
+--AA for approve & add a route
+--ITSO for ITSO route
+ALTER TABLE BCPMS_OWNER.ROUTE
+ ADD (DYNAMIC_TYPE  VARCHAR2(10 BYTE));
+ 
+ --Add this column to track if ITSO approved the request. it stores route id of the ITSO approval
+ALTER TABLE BCPMS_OWNER.REQUEST
+ ADD (ITSO_APPROVED  INTEGER);
+
+--after new SPs were created, remember to grant execution on any added new SPs
+GRANT EXECUTE ON BCPMS_OWNER.SP_INSERT_ROUTE_N TO BCPMS_APP;
+GRANT EXECUTE ON BCPMS_OWNER.sp_approve_and_add_route TO BCPMS_APP;
+GRANT EXECUTE ON BCPMS_OWNER.sp_dynamic_reroute TO BCPMS_APP;
+
+--remember to create synonyms in the app schema for the added SPs
+CREATE SYNONYM BCPMS_APP.SP_INSERT_ROUTE_N FOR BCPMS_OWNER.SP_INSERT_ROUTE_N;
+CREATE SYNONYM BCPMS_APP.sp_approve_and_add_route FOR BCPMS_OWNER.sp_approve_and_add_route; 
+CREATE SYNONYM BCPMS_APP.sp_dynamic_reroute FOR BCPMS_OWNER.sp_dynamic_reroute;

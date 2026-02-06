@@ -1,0 +1,24 @@
+# .trivyignore - Trivy vulnerability ignore file
+# Format: CVE-ID or vulnerability ID per line
+# Comments start with #
+
+# Example waived vulnerabilities - replace with your actual CVEs
+CVE-2022-40898
+
+# You can also ignore by package name
+# pkg:maven/org.apache.commons/commons-text@1.9
+
+# Ignore specific vulnerability in specific package
+# CVE-2023-12345 in package-name
+
+# Ignore all vulnerabilities in a specific package
+# pkg:npm/lodash@4.17.20
+
+# Ignore by severity (not recommended for production)
+# MEDIUM
+# LOW
+
+# Example of actual common CVEs you might want to waive:
+# CVE-2023-44487  # HTTP/2 Rapid Reset Attack
+# CVE-2023-39325  # Go HTTP/2 vulnerability
+# CVE-2023-3978   # Go HTML template vulnerability

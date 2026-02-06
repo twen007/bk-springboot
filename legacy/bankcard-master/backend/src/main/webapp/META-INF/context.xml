@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Context path="/empbc">
+  <!-- for local, no need to config the valve. test and prod envs will supply the correct config for valve
+   <Valve className="gov.nist.security.tomcat.OktaAuthenticator"
+        clientId="0oaj6azq7CCFKKFbi0j6"
+        clientSecret="8Ja204z3PXyhGqM9NnMoNogNLDdx5uE2dtUoi0FbOMZ0l9g0Td7rYh-LuSSyJl1K"
+        allowedDomains="chips.gov,nist.gov"
+    /> 
+     -->
+</Context>
+<!-- optional configs
+callbackURI="http://localhost:8080/empbc/index.jsp"
+sessionLess="true"
+debug="true"
+-->
+<!-- for LOCAL
+   <Valve className="gov.nist.security.tomcat.OktaAuthenticator"
+        clientId="0oaequh21mBXUR3Mw697"
+        clientSecret="6Aw_h3K-iOrXqXJKOeFy7Z7aUvwEngUQN_cH6EXSv0uARjkKIpmx0XyEa7VL4vz2"
+        allowedDomains="chips.gov,nist.gov,localhost"
+        debug="true"
+     />   
+        
+
+-->
+<!-- for TEST 
+ <Valve className="gov.nist.security.tomcat.OktaAuthenticator"
+        clientId="0oaj6bc1sotTVwZ2S0j6"
+        clientSecret="VMFUR1LneSZKr8WVdj4_9wT7QTtDXk08Elrm3H7uoK6fvQPM51GUgB67DW_j95Om"
+        allowedDomains="chips.gov,nist.gov"
+        debug="true"     
+    />
+
+-->
+<!-- for Prod
+
+ <Valve className="gov.nist.security.tomcat.OktaAuthenticator"
+        clientId="0oaj6azq7CCFKKFbi0j6"
+        clientSecret="8Ja204z3PXyhGqM9NnMoNogNLDdx5uE2dtUoi0FbOMZ0l9g0Td7rYh-LuSSyJl1K"
+        allowedDomains="chips.gov,nist.gov"
+    />
+
+-->

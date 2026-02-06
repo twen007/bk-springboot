@@ -1,0 +1,32 @@
+<!DOCTYPE HTML>
+
+<html manifest="" lang="en-US">
+<head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta charset="UTF-8">
+	<style id="antiClickjack">body { display:none !important; }</style>
+	<script type="text/javascript">
+	  if (self === top) {
+		  var antiClickjack = document.getElementById("antiClickjack");
+		  antiClickjack.parentNode.removeChild(antiClickjack);
+	  } else {
+		  top.location = self.location;
+	  }
+	</script>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-EW0CFKYG15"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-EW0CFKYG15');
+</script>
+    <title>Expense Management Program - Bankcard Purchase Request v4.1.2</title>
+    <script src="../JavaScriptServlet"></script>
+    <!-- The line below must be kept intact for Sencha Command to build your application -->
+    <script id="microloader" type="text/javascript" src="bootstrap.js"></script>
+</head>
+<body>
+</body>
+</html>

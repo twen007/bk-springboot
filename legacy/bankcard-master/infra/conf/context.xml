@@ -1,0 +1,62 @@
+<?xml version='1.0' encoding='utf-8'?>
+
+<!--  +++++++++++++++++++++++++++++++++++++++++++++
+     
+     This file is one of a suite of configuration files ...
+     context.xml
+     web.xml
+     tomcat_user.xml
+     server.xml
+     that we set up on our "deploying Apache httpd and Tomcat" course to
+     configure Tomcat and web applications that are running within it.
+     
+     +++++++++++++++++++++++++++++++++++++++++++++++++++  -->
+
+<!-- The contents of this file will be loaded for each web application -->
+
+<Context reloadable="true" privileged="true">
+  
+  <!-- **** Note - we have added in the reloadable and privileged attributes
+       to enable the invoker servlet and cgi support (other changes needed in
+       web.xml too for that, though **** -->
+
+  <!-- Default set of monitored resources -->
+  <WatchedResource>WEB-INF/web.xml</WatchedResource>
+  
+  <!-- Disable session persistence across Tomcat restarts -->
+  
+  <Manager pathname="" />
+  
+  <!-- Enable Comet connection tracking (provides events
+       on session expiration as well as webapp lifecycle) -->
+  <!--<Valve className="org.apache.catalina.valves.CometConnectionManagerValve" />-->
+  <!-- <Valve className="org.apache.catalina.authenticator.FormAuthenticator"
+         landingPage="secure/index.html"
+         changeSessionIdOnAuthentication="false" />
+  -->
+
+		
+     <Resource name="jdbc/bcws" 
+          auth="Container" 
+          type="javax.sql.DataSource" 
+          initialSize="5" 
+          maxTotal="200" 
+          factory="org.apache.tomcat.jdbc.pool.DataSourceFactory" 
+          maxIdle="50" minIdle="25" 
+          maxWaitMillis="30000" 
+          testOnBorrow="true" 
+          testWhileIdle="true"  
+          validationQuery="SELECT 1 from DUAL"  
+          validationQueryTimeout="120" 
+          removeAbandonedOnBorrow="true"  
+          logAbandoned="true" 
+          removeAbandonedTimeout="120"  
+          timeBetweenEvictionRunsMillis="30000" 
+          minEvictableIdleTimeMillis="60000"  
+          driverClassName="oracle.jdbc.OracleDriver" 
+          username="DB_USER"
+          password="DB_PASSWORD"
+          url="DB_URL"/>
+	<CookieProcessor className="org.apache.tomcat.util.http.LegacyCookieProcessor" sameSiteCookies="strict" />
+
+</Context>

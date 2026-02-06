@@ -1,0 +1,7 @@
+{
+    "webBuild": {
+        "environment": "production",
+        "clean": "on",
+        "publishPath": "C:\\Users\\xinweiw\\Documents\\work\\git\\restful_bankcard\\src\\main\\webapp\\app"
+    }
+}

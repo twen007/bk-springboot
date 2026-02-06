@@ -1,0 +1,20 @@
+CREATE OR REPLACE FUNCTION BCPMS_OWNER.get_user_name (
+   p_people_id   IN NIST_USER.PEOPLE_ID%TYPE)
+   RETURN NVARCHAR2
+IS
+   l_user_name   NVARCHAR2 (50);
+BEGIN
+   SELECT last_name || ', ' || first_name
+     INTO l_user_name
+     FROM NIST_USER
+    WHERE people_id = p_people_id;
+
+   RETURN l_user_name;
+END;
+/
+
+
+CREATE OR REPLACE SYNONYM BCPMS_APP.GET_USER_NAME FOR BCPMS_OWNER.GET_USER_NAME;
+
+
+GRANT EXECUTE ON BCPMS_OWNER.GET_USER_NAME TO BCPMS_APP;

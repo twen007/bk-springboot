@@ -1,0 +1,174 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: empbc
+  namespace: emp-test
+  labels:
+    app: empbc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: empbc
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: empbc
+        app.kubernetes.io/name: empbc
+    spec:
+      serviceAccountName: nistoismasd-eks-deploy
+      automountServiceAccountToken: false
+      securityContext:
+         runAsUser: 1101
+         runAsGroup: 1101
+         seccompProfile:
+           type: RuntimeDefault
+      containers:
+      - name: empbc
+        image: 232828153704.dkr.ecr.us-east-1.amazonaws.com/nistoismasd-emp:<version>
+        ports:
+          - containerPort: 8443
+        resources:
+          requests:
+            memory: "2536Mi"
+            cpu: 500m
+          limits:
+            memory: "2700Mi"
+            cpu: 550m
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop: ["ALL"]
+        env:
+        # Define the environment variable
+        - name: certSecretID
+          valueFrom:
+            configMapKeyRef:
+              name: empbc-test-config
+              key: certSecretID
+        - name: chainSecretID
+          valueFrom:
+            configMapKeyRef:
+              name: empbc-test-config
+              key: chainSecretID
+        - name: oktaroot
+          valueFrom:
+            configMapKeyRef:
+              name: empbc-test-config
+              key: oktaroot
+        - name: dependency
+          valueFrom:
+            configMapKeyRef:
+              name: empbc-test-config
+              key: dependency
+        - name: DB_URL
+          valueFrom:
+            configMapKeyRef:
+              name: empbc-test-config
+              key: db_url
+        - name: JNDI_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: empbc-test-config
+              key: jndi_name
+        - name: DB_USER
+          valueFrom:
+            configMapKeyRef:
+              name: empbc-test-config
+              key: db_user
+        - name: ENV
+          valueFrom:
+            configMapKeyRef:
+              name: empbc-test-config
+              key: env
+        - name: AWS_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: empbc-test-config
+              key: AWS_REGION
+        - name: CLUSTER_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: empbc-test-config
+              key: CLUSTER_NAME
+        - name: appRedirectURI
+          valueFrom:
+            configMapKeyRef:
+              name: empbc-test-config
+              key: appRedirectURI
+        - name: appLogoutURI
+          valueFrom:
+            configMapKeyRef:
+              name: empbc-test-config
+              key: appLogoutURI
+        - name: target_mode
+          valueFrom:
+            configMapKeyRef:
+              name: empbc-test-config
+              key: target_mode
+        - name: HOST_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: core-db-creds-empbc
+              key: dbPass
+        - name: KEYSTOREPASS
+          valueFrom:
+            secretKeyRef:
+              name: core-db-creds-empbc
+              key: keystorePass
+        - name: AADCLIENTID
+          valueFrom:
+            secretKeyRef:
+              name: core-db-creds-empbc
+              key: aadClientId
+        - name: AADSECRET
+          valueFrom:
+            secretKeyRef:
+              name: core-db-creds-empbc
+              key: aadSecret              
+        volumeMounts:
+        - name: log-storage
+          mountPath: /usr/local/tomcat/logs/
+      # allow rolling restart to give time for tomcat to load before shutdown old pod
+      #terminationGracePeriodSeconds: 400
+      - name: fluent-bit
+        image: fluent/fluent-bit
+        volumeMounts:
+        - name: log-storage
+          mountPath: /mnt/log/
+          readOnly: true
+        - name: fluent-bit-config
+          mountPath: /fluent-bit/etc/
+        resources:
+          requests:
+            memory: "100Mi"
+            cpu: 100m
+          limits:
+            memory: "100Mi"
+            cpu: 100m
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop: ["ALL"]
+      terminationGracePeriodSeconds: 120
+      volumes:
+      - name: log-storage
+        emptyDir: {}
+      - name: fluent-bit-config
+        configMap:
+          name: fluent-bit-sidecar-config-empbc
+
+

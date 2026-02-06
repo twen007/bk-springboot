@@ -1,0 +1,536 @@
+.stages:
+  - build
+  - copy
+  - package
+  - deploy
+
+stages:
+  - lint
+  - test
+  - build
+  - post-build-scans
+  - deploy
+
+workflow:
+  rules:
+    - if: '$CI_COMMIT_TAG'                    # Allow all tag pipelines
+      when: always
+    - if: '$CI_MERGE_REQUEST_ID'
+      when: never
+    - when: always
+
+variables:
+  NODE_VERSION: "23.10.0"
+  SENCHA_CMD_VERSION: "7.8.0"
+  JAVA_VERSION: "17"
+  TOMCAT_VERSION: "9.0.102-jdk17-corretto"
+  APP_NAME: "bcp"
+  PRODUCTION_CLIENT_BUILD_PATH: "frontend/build/production/${APP_NAME}"
+  BACKEND_APP_PATH: "backend/src/main/webapp/app"
+  ARTIFACT_NAME: "${APP_NAME}-production-build"
+  WAR_FILE_NAME: "empbc.war"
+  CI_REGISTRY_REPO: 232828153704.dkr.ecr.us-east-1.amazonaws.com/nistoismasd-emp
+  SAST_EXCLUDED_ANALYZERS: "spotbugs,bandit,gosec,eslint"
+  IMAGE_TAG: empbc_${CI_COMMIT_SHORT_SHA}
+
+include:
+  - template: Jobs/SAST.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
+
+secret_detection:
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never  # Don't run on tag creation
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+      when: always
+  tags:
+    - acsdocker
+  script:
+    - echo "Enabling tag for Secret detection"
+
+docker_lint:
+  stage: lint
+  image: node:18-alpine
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+      when: always
+  tags:
+    - acsdocker
+  before_script:
+    - npm install -g dockerfile_lint
+  script:
+    - cd ${CI_PROJECT_DIR}/infra
+    - dockerfile_lint -j -f Dockerfile
+  environment: empbc
+
+#sencha not working
+.build-empbc:
+  stage: build
+  #image: node:20-bookworm
+  image: maven:3.9-eclipse-temurin-17
+  tags:
+    - acsdocker
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never  
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+      when: always
+    - when: never 
+  before_script:
+    - echo "--- Setting up environment for all steps ---"
+    # Fix entropy issue for curl/wget TLS
+    - apt-get update -y
+    - apt-get install -y gnupg curl ca-certificates rng-tools git git-lfs rsync
+    - rngd -r /dev/urandom &
+    # Install Node.js 20
+    - curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    - apt-get install -y nodejs
+    - echo "Node version ==> $(node -v)"
+    - echo "NPM version ==> $(npm -v)"
+    # Install Sencha Cmd
+    - npm install -g @sencha/cmd@${SENCHA_CMD_VERSION}
+    - chmod +x /usr/local/lib/node_modules/@sencha/cmd/dist/sencha
+    - echo "Sencha Cmd installed and permissions set."
+  script:
+    - echo "--- Starting combined build process ---"
+    - echo "Preparing Sencha environment..."
+    - mkdir -p frontend/ext
+    - echo "Created frontend/ext directory."
+    - cp ext-lib/ext.tar.gz frontend/
+    - echo "Copied ext-lib to frontend."
+    - cd frontend
+    - echo "Current directory is $(pwd)"
+    - tar -xzf ext.tar.gz
+    - echo "Extracted ext.tar.gz to frontend."
+    - if [ -f ext.tar.gz ]; then rm ext.tar.gz; echo "Removed ext.tar.gz"; fi
+    - echo "Starting Sencha build..."
+    - sencha app build production
+    - echo "Sencha build completed."
+    - cd ..
+    - echo "Copying frontend build to backend..."
+    - mkdir -p ${BACKEND_APP_PATH}
+    - rsync -av ${PRODUCTION_CLIENT_BUILD_PATH}/* ${BACKEND_APP_PATH}/
+    - echo "Frontend build copied to backend."
+    - echo "Building WAR file..."
+    - cd backend
+    - echo "Current directory===> $(pwd)"
+    - echo "Building WAR file with Maven..."
+    - mvn clean package -DskipTests -Ptest
+    - cd ..
+      # Copy WAR file to root directory
+    - cp backend/target/${WAR_FILE_NAME} .
+    - echo "WAR file built."
+  artifacts:
+    paths:
+      - ./empbc.war
+    expire_in: 1 day
+  environment: empbc
+
+
+build-empbc:
+  stage: build
+  image: terrestris/gitlab-runner-image:node18-bullseye-jdk17-2
+  tags:
+    - acsdocker
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+      when: always
+    - when: never
+  before_script:
+  - echo "Setting up build environment..."
+  # Install required system packages
+  - apt-get update && apt-get install -y rsync unzip wget
+  - |
+    # Install ant
+    wget --no-check-certificate --no-cookies http://archive.apache.org/dist/ant/binaries/apache-ant-1.9.9-bin.tar.gz
+    tar -zvxf apache-ant-1.9.9-bin.tar.gz -C /opt/
+    ln -s /opt/apache-ant-1.9.9 /opt/ant
+    
+    # Download and install JDK 8 (not just JRE) - Sencha needs full JDK
+    mkdir -p /opt/java
+    wget --no-check-certificate --no-cookies https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u352-b08/OpenJDK8U-jdk_x64_linux_hotspot_8u352b08.tar.gz -O jdk8.tar.gz
+    tar -xzf jdk8.tar.gz -C /opt/java
+    export JAVA8_HOME=/opt/java/jdk8u352-b08
+    echo "Java 8 home is: $JAVA8_HOME"
+    
+    # Install Sencha CMD with Java 8
+    echo "Installing Sencha CMD..."
+    export JAVA_HOME=$JAVA8_HOME
+    wget -q https://cdn.sencha.com/cmd/7.6.0.87/no-jre/SenchaCmd-7.6.0.87-linux-amd64.sh.zip
+    unzip -q SenchaCmd-7.6.0.87-linux-amd64.sh.zip
+    chmod +x SenchaCmd-7.6.0.87-linux-amd64.sh
+    ./SenchaCmd-7.6.0.87-linux-amd64.sh -q -dir /opt/Sencha/Cmd
+    
+    # Set environment for Sencha CMD to use Java 8
+    export SENCHA_CMD_JAVA_HOME=$JAVA8_HOME
+    export INSTALL4J_JAVA_HOME=$JAVA8_HOME
+    
+    # Find the correct Sencha CMD path
+    SENCHA_PATH=$(find /opt/Sencha/Cmd -name "sencha" -type f | head -1)
+    SENCHA_DIR=$(dirname "$SENCHA_PATH")
+    export PATH="$SENCHA_DIR:/opt/ant/bin:$PATH"
+    
+    echo "Sencha CMD path: $SENCHA_PATH"
+    echo "SENCHA_CMD_JAVA_HOME: $SENCHA_CMD_JAVA_HOME"
+    
+    # Verify Sencha installation with Java 8
+    $SENCHA_PATH help || echo "Sencha CMD verification failed"
+    
+    # Switch back to Java 17 for Maven build (but keep Sencha using Java 8)
+    export MAVEN_JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+    export OPENSSL_CONF=/etc/ssl/
+    
+    cd ${CI_PROJECT_DIR}
+  script:
+    - echo "--- Starting combined build process ---"
+    # Set Java 8 for Sencha operations
+    - export JAVA_HOME=$JAVA8_HOME
+    - export SENCHA_CMD_JAVA_HOME=$JAVA8_HOME
+    - echo "Using Java 8 for Sencha ==> $(java -version)"
+    
+    - echo "Preparing Sencha environment..."
+    - mkdir -p frontend/ext
+    - echo "Created frontend/ext directory."
+    - cp ext-lib/ext.tar.gz frontend/
+    - echo "Copied ext-lib to frontend."
+    - cd frontend
+    - echo "Current directory is $(pwd)"
+    - tar -xzf ext.tar.gz
+    - echo "Extracted ext.tar.gz to frontend."
+    - if [ -f ext.tar.gz ]; then rm ext.tar.gz; echo "Removed ext.tar.gz"; fi
+    - echo "Starting Sencha build..."
+    - sencha app build production
+    - echo "Sencha build completed."
+    - cd ..
+    - echo "Copying frontend build to backend..."
+    - mkdir -p ${BACKEND_APP_PATH}
+    - rsync -av ${PRODUCTION_CLIENT_BUILD_PATH}/* ${BACKEND_APP_PATH}/
+    - echo "Frontend build copied to backend."
+    # ✅ SWITCH TO JAVA 17 FOR MAVEN BUILD
+    - echo "Switching to Java 17 for Maven build..."
+    - export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+    - export PATH="$JAVA_HOME/bin:$PATH"
+    - echo "Now using Java 17 ==> $(java -version)"
+    - echo "Maven Java version ==> $(mvn -version | head -3)"
+    - echo "Building WAR file..."
+    - cd backend
+    - echo "Current directory===> $(pwd)"
+    - echo "Building WAR file with Maven..."
+    - mvn clean package -DskipTests -Ptest
+    - cd ..
+    - cp backend/target/${WAR_FILE_NAME} .
+    - echo "WAR file built."
+  artifacts:
+    paths:
+      - ./empbc.war
+    expire_in: 1 day
+
+build-image: 
+  stage: build
+  needs: [build-empbc]
+  tags:
+    - acsdocker
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never  
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+      when: always
+    - when: never 
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    #- echo "Environment variable value is --" $ENV
+    - mkdir -p /kaniko/.docker
+    - echo "{\"credsStore\":\"ecr-login\"}" > /kaniko/.docker/config.json
+    - cat /kaniko/.docker/config.json
+    - /kaniko/executor
+      --context "${CI_PROJECT_DIR}"
+      --dockerfile "${CI_PROJECT_DIR}/infra/Dockerfile"
+      --destination "${CI_REGISTRY_REPO}:${IMAGE_TAG}"
+      --compressed-caching=false
+      --snapshotMode=redo
+  environment: empbc
+
+owasp dependency check scan:
+  image:
+    name: registry.gitlab.com/gitlab-ci-utils/docker-dependency-check:latest
+    entrypoint: [""]
+  stage: post-build-scans
+  tags:
+    - acsdocker
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never  # Don't run on tag creation
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+      when: always
+    - when: never 
+  before_script:
+    - export JAVA_OPTS="-XX:InitialRAMPercentage=30.0 -XX:MinRAMPercentage=60.0 -XX:MaxRAMPercentage=90.0"
+  script:
+    - echo "Project Name:" $CI_PROJECT_NAME
+    - echo "Project Directory:" $CI_PROJECT_DIR 
+    - /usr/share/dependency-check/bin/dependency-check.sh --ossIndexRemoteErrorWarnOnly true --scan "$CI_PROJECT_DIR/empbc.war" --format ALL --project "$CI_PROJECT_NAME" --disableCentral
+  allow_failure: true
+  artifacts:
+    when: always
+    paths:
+        # Save the HTML and JSON report artifacts
+      - "./dependency-check-report.html"
+      - "./dependency-check-report.json"
+  environment: empbc
+
+check-OWASP-dependency-scan-results:
+  image: alpine
+  tags:
+    - acsdocker
+  stage: post-build-scans
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+      when: always
+    - when: never 
+  before_script:
+    - apk add --no-cache jq
+  script:
+    - echo "Current directory contents:"
+    - ls -la
+    - echo "Looking for dependency-check-report.json..."
+    - find . -name "*dependency-check*" -type f
+    - CHECK_RESULT=$(cat dependency-check-report.json | jq '[.. | .severity? | select((. != null) and (. | tostring | test("(?i)high|critical|medium")))] | length')
+    - echo "Found $CHECK_RESULT critical/high/medium vulnerabilities"
+    - if [[ $CHECK_RESULT -gt 0 ]]; then exit 2; fi
+  needs: 
+    - job: "owasp dependency check scan"
+      artifacts: true
+  dependencies:
+    - "owasp dependency check scan"  # Add this line
+  allow_failure: true
+  artifacts:
+    when: always
+    paths:
+      - "./dependency-check-report.html"
+      - "./dependency-check-report.json"
+  environment: empbc
+
+trivy-container-scan:
+  stage: post-build-scans
+  tags:
+    - acsdocker
+  image:
+    name: docker.io/aquasec/trivy:latest
+    entrypoint: [""]
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never  # Don't run on tag creation
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+      when: always
+    - when: never 
+  variables:
+    # No need to clone the repo, we exclusively work on artifacts. See
+    # https://docs.gitlab.com/ee/ci/runners/configure_runners.html#git-strategy
+    GIT_STRATEGY: fetch
+    #TRIVY_USERNAME: "$CI_REGISTRY_USER"
+    #TRIVY_PASSWORD: "$CI_REGISTRY_PASSWORD"
+    #TRIVY_AUTH_URL: "xdocker.nist.gov:5050"
+    #TRIVY_NO_PROGRESS: "true"
+    TRIVY_CACHE_DIR: ".trivycache/"
+    FULL_IMAGE_NAME: $CI_REGISTRY_REPO:$IMAGE_TAG
+    #FULL_IMAGE_NAME: "232828153704.dkr.ecr.us-east-1.amazonaws.com/nistoismasd-emp:pers_260103_cded58a9"
+  script:
+    #- docker pull $FULL_IMAGE_NAME
+    - trivy --version
+    # cache cleanup is needed when scanning images with the same tags, it does not remove the database
+    #- time trivy image --clear-cache
+    # update vulnerabilities db
+    - time trivy image --download-db-only
+    # Builds report and puts it in the default workdir $CI_PROJECT_DIR, so `artifacts:` can take it from there
+    #- time trivy image --ignore-unfixed --exit-code 0 --format template --template "@/contrib/gitlab.tpl" --output "$CI_PROJECT_DIR/gl-container-scanning-report.json" "$FULL_IMAGE_NAME"
+    - time trivy image --ignore-unfixed --ignorefile ./infra/.trivyignore --exit-code 0 --format template --template "@/contrib/gitlab.tpl" --output "$CI_PROJECT_DIR/gl-container-scanning-report.json" "$FULL_IMAGE_NAME"
+    - time trivy image --ignore-unfixed --ignorefile ./infra/.trivyignore --exit-code 0 "$FULL_IMAGE_NAME"
+    # Fail on critical vulnerabilities
+    #- time trivy image --exit-code 1 --severity CRITICAL "$FULL_IMAGE_NAME"
+  cache:
+    paths:
+      - .trivycache/
+  # Enables https://docs.gitlab.com/ee/user/application_security/container_scanning/ (Container Scanning report is available on GitLab EE Ultimate or GitLab.com Gold)
+  artifacts:
+    when: always
+    paths:
+      # Save JSON report artifacts
+      - "./gl-container-scanning-report.json"
+    #reports:
+    #  container_scanning: gl-container-scanning-report.json
+  environment: empbc
+
+check-trivy-container-scan-results:
+  image: alpine
+  tags:
+    - acsdocker
+  stage: post-build-scans
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+      when: always
+    - when: never 
+  before_script:
+    - apk add --no-cache jq
+  script:
+    - echo "Current directory contents:"
+    - ls -la
+    - echo "Looking for gl-container-scanning-report.json..."
+    - find . -name "*container-scanning*" -type f
+    - CHECK_RESULT=$(cat gl-container-scanning-report.json | jq '[.. | .severity? | select((. != null) and (. | tostring | test("(?i)high|critical|medium")))] | length')
+    - echo "Found $CHECK_RESULT critical/high/medium vulnerabilities"
+    - if [[ $CHECK_RESULT -gt 0 ]]; then exit 2; fi
+  needs: 
+    - job: "trivy-container-scan"
+      artifacts: true
+  dependencies:
+    - "trivy-container-scan"  # Add this line
+  allow_failure: true
+  artifacts:
+    when: always
+    paths:
+      - "./gl-container-scanning-report.json"
+  environment: empbc
+
+deploy empbc to Test:
+  stage: deploy
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push"' 
+      when: on_success
+  tags:
+    - acsdocker
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+      when: always
+  image: registry.gitlab.com/gitlab-org/cloud-deploy/aws-base:latest
+  #variables:
+  #  IMAGE_TAG: ${RELEASE_VERSION}_${CI_COMMIT_SHORT_SHA}
+  before_script:
+    - echo "Image tag is $IMAGE_TAG"
+    - echo "Preparing CI/CD variables"
+    - "sed -i 's/{certSecretID}/emp-test-certs/g' ./infra/deploy/test/configmap.yaml"
+    - "sed -i 's/{chainSecretID}/nistchainroot/g' ./infra/deploy/test/configmap.yaml"
+    - "sed -i 's/{oktaroot}/okta-login-certs/g' ./infra/deploy/test/configmap.yaml"
+    - "sed -i 's/{dependency}/tstweb-certs/g' ./infra/deploy/test/configmap.yaml"
+    # '@' is used as separator when value contains '/'
+    # Non-secret system configuration
+    - "sed -i 's/{DB_USER}/'$EMPBC_TEST_DB_USER'/g' ./infra/deploy/test/configmap.yaml"
+    #- temp3=$(grep -i db_user .infra/deploy/test/configmap.yaml)
+    #- echo " value is -- $VRS_TEST_DB_USER  && $temp3"
+    - "sed -i 's/{DB_URL}/'$EMPBC_TEST_DB_URL'/g' ./infra/deploy/test/configmap.yaml"
+    - "sed -i 's@{JNDI_NAME}@'$EMPBC_TEST_JNDI_Name'@g' ./infra/deploy/test/configmap.yaml"
+    - "sed -i 's/{ENV}/test/g' ./infra/deploy/test/configmap.yaml"
+    - "sed -i 's/{AWS_REGION}/'$EKS130_AWS_DEFAULT_REGION'/g' ./infra/deploy/test/configmap.yaml"
+    - "sed -i 's/{CLUSTER_NAME}/'$CLUSTER_NAME'/g' ./infra/deploy/test/configmap.yaml"
+    - "sed -i 's@{appRedirectURI}@'$appRedirectURI'@g' ./infra/deploy/test/configmap.yaml"
+    - "sed -i 's@{appLogoutURI}@'$appLogoutURI'@g' ./infra/deploy/test/configmap.yaml"
+    #- "sed -i 's/{appRoles}/'$appRoles'/g' ./deploy/vrs/test/configmap.yaml"
+    # EKS secret system configuration
+    - "sed -i 's/{DB_PASSWORD_B64ENC}/'$EMPBC_TEST_DB_PASSWORD_B64ENC'/g' ./infra/deploy/test/secrets.yaml"
+    #- "sed -i 's/{CONNECTION_PWD_B64ENC}/'$NAIS_CONNECTION_PWD_B64ENC'/g' ./infra/deploy/test/secrets.yaml" 
+    - "sed -i 's/{keystorePass_B64ENC}/'$keystorePass_B64ENC'/g' ./infra/deploy/test/secrets.yaml"
+    - "sed -i 's/{aadClientId_B64ENC}/'$aadClientId_B64ENC'/g' ./infra/deploy/test/secrets.yaml"
+    - "sed -i 's/{aadSecret_B64ENC}/'$aadSecret_B64ENC'/g' ./infra/deploy/test/secrets.yaml"
+    - aws ecr get-login-password  --region us-east-1 | docker login --username AWS --password-stdin $(echo $CI_REGISTRY_REPO | cut -d "/" -f1)
+    - echo "Setup AWS EKS access"
+    - curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.19.6/2021-01-05/bin/linux/amd64/kubectl
+    - chmod +x ./kubectl
+    - aws sts get-caller-identity
+    - aws eks --region us-east-1 update-kubeconfig --name int-rh9-ec2-130-test     
+  script:
+    - echo "Starting EMPC deployment to EKS cluster"
+    - sed -i 's/<version>/'$IMAGE_TAG'/g' ./infra/deploy/test/deployment.yaml
+    - ./kubectl apply -f ./infra/deploy/test/secrets.yaml
+    - ./kubectl apply -f ./infra/deploy/test/configmap.yaml
+    - ./kubectl apply -f ./infra/deploy/test/serviceaccounts-130.yaml
+    - ./kubectl apply -f ./infra/deploy/test/fluentbit-configmap.yaml
+    - ./kubectl apply -f ./infra/deploy/test/deployment.yaml
+    - ./kubectl apply -f ./infra/deploy/test/networkpolicy.yaml
+    - echo "Wait 120 seconds for Pod to restart"
+    - sleep 120
+  environment: empbc
+
+deploy empbc to EKS 133Test:
+  stage: deploy
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push"' 
+      when: on_success
+  tags:
+    - acsdocker
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+      when: always
+  image: registry.gitlab.com/gitlab-org/cloud-deploy/aws-base:latest
+  #variables:
+  #  IMAGE_TAG: ${RELEASE_VERSION}_${CI_COMMIT_SHORT_SHA}
+  before_script:
+    - echo "Image tag is $IMAGE_TAG"
+    - echo "Preparing CI/CD variables"
+    - "sed -i 's/{certSecretID}/emp-test-certs/g' ./infra/deploy/test/configmap.yaml"
+    - "sed -i 's/{chainSecretID}/nistchainroot/g' ./infra/deploy/test/configmap.yaml"
+    - "sed -i 's/{oktaroot}/okta-login-certs/g' ./infra/deploy/test/configmap.yaml"
+    - "sed -i 's/{dependency}/tstweb-certs/g' ./infra/deploy/test/configmap.yaml"
+    # '@' is used as separator when value contains '/'
+    # Non-secret system configuration
+    - "sed -i 's/{DB_USER}/'$EMPBC_TEST_DB_USER'/g' ./infra/deploy/test/configmap.yaml"
+    #- temp3=$(grep -i db_user .infra/deploy/test/configmap.yaml)
+    #- echo " value is -- $VRS_TEST_DB_USER  && $temp3"
+    - "sed -i 's/{DB_URL}/'$EMPBC_TEST_DB_URL'/g' ./infra/deploy/test/configmap.yaml"
+    - "sed -i 's@{JNDI_NAME}@'$EMPBC_TEST_JNDI_Name'@g' ./infra/deploy/test/configmap.yaml"
+    - "sed -i 's/{ENV}/test/g' ./infra/deploy/test/configmap.yaml"
+    - "sed -i 's/{AWS_REGION}/'$EKS130_AWS_DEFAULT_REGION'/g' ./infra/deploy/test/configmap.yaml"
+    - "sed -i 's/{CLUSTER_NAME}/'$CLUSTER_NAME'/g' ./infra/deploy/test/configmap.yaml"
+    - "sed -i 's@{appRedirectURI}@'$appRedirectURI'@g' ./infra/deploy/test/configmap.yaml"
+    - "sed -i 's@{appLogoutURI}@'$appLogoutURI'@g' ./infra/deploy/test/configmap.yaml"
+    #- "sed -i 's/{appRoles}/'$appRoles'/g' ./deploy/vrs/test/configmap.yaml"
+    # EKS secret system configuration
+    - "sed -i 's/{DB_PASSWORD_B64ENC}/'$EMPBC_TEST_DB_PASSWORD_B64ENC'/g' ./infra/deploy/test/secrets.yaml"
+    #- "sed -i 's/{CONNECTION_PWD_B64ENC}/'$NAIS_CONNECTION_PWD_B64ENC'/g' ./infra/deploy/test/secrets.yaml" 
+    - "sed -i 's/{keystorePass_B64ENC}/'$keystorePass_B64ENC'/g' ./infra/deploy/test/secrets.yaml"
+    - "sed -i 's/{aadClientId_B64ENC}/'$aadClientId_B64ENC'/g' ./infra/deploy/test/secrets.yaml"
+    - "sed -i 's/{aadSecret_B64ENC}/'$aadSecret_B64ENC'/g' ./infra/deploy/test/secrets.yaml"
+    - aws ecr get-login-password  --region us-east-1 | docker login --username AWS --password-stdin $(echo $CI_REGISTRY_REPO | cut -d "/" -f1)
+    - echo "Setup AWS EKS access"
+    - curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.19.6/2021-01-05/bin/linux/amd64/kubectl
+    - chmod +x ./kubectl
+    - aws sts get-caller-identity
+    - aws eks --region us-east-1 update-kubeconfig --name int-rh9-ec2-133-test     
+  script:
+    - echo "Starting EMPC deployment to EKS cluster"
+    - sed -i 's/<version>/'$IMAGE_TAG'/g' ./infra/deploy/test/deployment.yaml
+    - ./kubectl apply -f ./infra/deploy/test/secrets.yaml
+    - ./kubectl apply -f ./infra/deploy/test/configmap.yaml
+    - ./kubectl apply -f ./infra/deploy/test/serviceaccounts.yaml
+    - ./kubectl apply -f ./infra/deploy/test/fluentbit-configmap.yaml
+    - ./kubectl apply -f ./infra/deploy/test/deployment.yaml
+    - ./kubectl apply -f ./infra/deploy/test/networkpolicy.yaml
+    - echo "Wait 120 seconds for Pod to restart"
+    - sleep 120
+  environment: empbc
+
+Notify EMPBC PROD deploy readiness to MwT:
+  stage: deploy
+  rules:
+    - if: '$CI_COMMIT_TAG'  # run on any tag creation
+      when: manual
+  image: registry.gitlab.com/gitlab-org/cloud-deploy/aws-base:latest
+  tags:
+    - acsdocker 
+  script:
+    - echo "Tag detected ==> $CI_COMMIT_TAG"
+    - echo "Image tag ==> $IMAGE_TAG"
+    - curl --request POST --form variables[EMPBC_IMAGE_TAG]="$IMAGE_TAG" "https://sgitlab.nist.gov/api/v4/projects/1854/trigger/pipeline?token=glptt-7ef5f42e1c68a63efd09f1e096fb0ecd17987108&ref=master"
+  environment: empbc

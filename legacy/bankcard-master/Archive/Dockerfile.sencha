@@ -1,0 +1,34 @@
+    # AUTHOR: Xinwei Wen
+    # DATE: 2025-03-20
+    # VERSION: 1.0
+    # NOTES: This Dockerfile is used to build the Sencha ExtJS client application. The Main Dockerfile can reuse it to build the app.
+    # USAGE: docker build -f Dockerfile.sencha -t sencha-builder:latest .
+    # TAG: docker tag sencha-builder:latest sdocker.nist.gov:5050/mml-lab-office/bankcard/sencha-builder:1.1
+    # PUSH: docker push sdocker.nist.gov:5050/mml-lab-office/bankcard/sencha-builder:1.1
+    
+    # --- Stage 1: Node.js Builder ---
+    FROM node:23.10.0 AS client_builder
+ 
+    WORKDIR /app
+    
+    # Install JRE (OpenJDK 17)
+    RUN apt-get update && apt-get install -y --no-install-recommends openjdk-17-jre-headless
+    
+    # Set JAVA_HOME (optional but recommended)
+    ENV JAVA_HOME /usr/lib/jvm/java-17-openjdk-amd64
+    
+    # Install Sencha Cmd (globally)
+    RUN npm install -g @sencha/cmd@7.8.0
+    
+    # Grant execute permissions to the sencha executable
+    RUN chmod +x /usr/local/lib/node_modules/@sencha/cmd/dist/sencha
+
+    # Copy the library from the build context to the container
+    COPY ext-lib/ext.tar.gz /app/ext/ext.tar.gz
+
+    # Extract the library
+    RUN tar -xzf /app/ext/ext.tar.gz -C /app
+
+    # Remove the tar.gz file after extraction
+    # Check if /app/ext.tar.gz exists and remove it if it does
+    RUN if [ -f /app/ext.tar.gz ]; then rm /app/ext.tar.gz; fi

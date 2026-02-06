@@ -1,0 +1,2 @@
+ALTER TABLE BCPMS_OWNER.ROUTE
+ ADD (OMIT_NOTIFICATION  INTEGER                    DEFAULT 0                     NOT NULL);

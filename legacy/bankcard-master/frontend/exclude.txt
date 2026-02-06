@@ -1,0 +1,11 @@
+.svn
+.git
+.hg
+.DS_Store
+.cvs
+metadata
+*.xds
+.xds
+.architect
+.sencha_backup
+archive

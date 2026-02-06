@@ -1,0 +1,182 @@
+{
+  "name": "bcp",
+  "namespace": "bcp",
+  "version": "2.6.7",
+  "framework": "ext",
+  "toolkit": "classic",
+  "theme": "theme-triton-9dcfd22e-98f2-45b2-8b14-1d042fad58a2",
+  "requires": [
+    "exporter",
+    "font-awesome",
+    "ext-ux"
+  ],
+  "indexHtmlPath": "index.html",
+  "classpath": "${app.dir}/app,${app.dir}/app/override/grid/column/,${app.dir}/app/override/data/",
+  "overrides": [
+    "overrides"
+  ],
+  "fashion": {
+    "missingParameters": "error",
+    "inliner": {
+      "enable": false
+    }
+  },
+  "sass": {
+    "namespace": "bcp",
+    "generated": {
+      "var": "sass/save.scss",
+      "src": "sass/save"
+    },
+    "etc": [
+      "sass/etc/all.scss"
+    ],
+    "var": [
+      "sass/var/all.scss",
+      "sass/var"
+    ],
+    "src": [
+      "sass/src"
+    ]
+  },
+  "js": [
+    {
+      "path": "${framework.dir}/build/ext-all-rtl-debug.js"
+    },
+    {
+      "path": "app/override/data/Store.js",
+      "bootstrap": true,
+      "x-compile": true,
+      "includeInBundle": true
+    },
+    {
+      "path": "app.js",
+      "bundle": true
+    }
+  ],
+  "css": [
+    {
+      "path": "${build.out.css.path}",
+      "bundle": true,
+      "exclude": [
+        "fashion"
+      ]
+    }
+  ],
+  "loader": {
+    "cache": false,
+    "cacheParam": "_dc"
+  },
+  "production": {
+    "output": {
+      "appCache": {
+        "enable": false
+      }
+    },
+    "loader": {
+      "cache": "${build.timestamp}"
+    },
+    "cache": {
+      "enable": false
+    },
+    "compressor": {
+      "type": "yui"
+    }
+  },
+  "testing": {},
+  "development": {
+    "watch": {
+      "delay": 250
+    }
+  },
+  "bootstrap": {
+    "base": "${app.dir}",
+    "microloader": "bootstrap.js",
+    "css": "bootstrap.css"
+  },
+  "output": {
+    "base": "${workspace.build.dir}/${build.environment}/${app.name}",
+    "appCache": {
+      "enable": false
+    }
+  },
+  "cache": {
+    "enable": false,
+    "deltas": true
+  },
+  "appCache": {
+    "cache": [
+      "index.html"
+    ],
+    "network": [
+      "*"
+    ],
+    "fallback": []
+  },
+  "resources": [
+    {
+      "path": "resources",
+      "output": "shared"
+    }
+  ],
+  "archivePath": "archive",
+  "slicer": {
+    "js": [
+      {
+        "path": "sass/example/custom.js",
+        "isWidgetManifest": true
+      }
+    ],
+    "output": {
+      "appCache": {
+        "enable": false
+      }
+    },
+    "cache": {
+      "enable": false
+    }
+  },
+  "ignore": [
+    "(^|/)CVS(/?$|/.*?$)"
+  ],
+  "progressive": {
+    "manifest": {
+      "name": "OU Bankcard Purchase Preapproval",
+      "short_name": "OU Bankcard",
+      "icons": [
+        {
+          "src": "resources/images/icon-small.png",
+          "sizes": "96x66"
+        },
+        {
+          "src": "resources/images/icon-medium.png",
+          "sizes": "192x132"
+        },
+        {
+          "src": "resources/images/icon-large.png",
+          "sizes": "256x176"
+        }
+      ],
+      "theme_color": "#054059",
+      "background_color": "#054059",
+      "display": "standalone",
+      "orientation": "portrait",
+      "start_url": "/index.html"
+    },
+    "serviceWorker": {
+      "maximumFileSizeToCacheInBytes": 4194304,
+      "runtimeCaching": [
+        {
+          "urlPattern": "\\/empbc\\/v1\\/users\\/profile",
+          "handler": "networkOnly",
+          "strategyOptions": {
+            "fetchOptions": {
+              "mode": "same-origin",
+              "credentials": "same-origin"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "id": "3b5942a5-ec58-4933-8502-7df9ebe485cf"
+}
